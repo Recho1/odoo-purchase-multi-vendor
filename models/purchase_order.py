@@ -1,4 +1,4 @@
-from odoo import models, fields
+from odoo import models, fields, api
 
 
 class PurchaseOrder(models.Model):
@@ -19,11 +19,22 @@ class PurchaseOrder(models.Model):
         help='Bids received from vendors against this RFQ.',
     )
 
-    def action_rfq_send(self, force_send=False):
+    @api.onchange('vendor_ids')
+    def _onchange_vendor_ids(self):
+        """Convenience: if the primary Vendor field is empty, default it to
+        the first vendor selected in the Vendors list, so the user usually
+        only needs to interact with one field."""
+        if self.vendor_ids and not self.partner_id:
+            self.partner_id = self.vendor_ids[0]
+
+    def action_rfq_send(self, *args, **kwargs):
         """Extend the default 'Send RFQ' action so the email composer
         also includes every vendor in vendor_ids as a recipient,
-        not just the primary Vendor (partner_id)."""
-        res = super().action_rfq_send(force_send=force_send)
+        not just the primary Vendor (partner_id).
+
+        Accepts *args/**kwargs rather than a fixed signature since the
+        core method's exact parameters vary between Odoo versions."""
+        res = super().action_rfq_send(*args, **kwargs)
         if isinstance(res, dict) and res.get('context'):
             extra_partner_ids = self.vendor_ids.ids
             if extra_partner_ids:
