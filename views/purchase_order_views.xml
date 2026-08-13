@@ -11,6 +11,26 @@
                        options="{'no_create': True}"
                        placeholder="Add additional vendors..."/>
             </field>
+            <xpath expr="//notebook" position="inside">
+                <page string="Bids" name="bids">
+                    <field name="bid_ids">
+                        <list editable="bottom" decoration-success="is_winner == True">
+                            <field name="vendor_id"/>
+                            <field name="price"/>
+                            <field name="currency_id" column_invisible="1"/>
+                            <field name="notes"/>
+                            <field name="state" widget="badge"
+                                   decoration-success="state == 'won'"
+                                   decoration-danger="state == 'lost'"/>
+                            <button name="action_select_as_winner"
+                                    type="object"
+                                    string="Select as Winner"
+                                    class="btn-primary"
+                                    invisible="state != 'submitted'"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
         </field>
     </record>
 
