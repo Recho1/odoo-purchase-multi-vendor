@@ -5,6 +5,7 @@ from odoo.exceptions import UserError
 class PurchaseRequest(models.Model):
     _name = 'purchase.request'
     _description = 'Purchase Request'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _order = 'create_date desc'
 
     name = fields.Char(
@@ -18,21 +19,17 @@ class PurchaseRequest(models.Model):
         string='Requested By',
         default=lambda self: self.env.user,
         required=True,
-    )
-    product_id = fields.Many2one(
-        comodel_name='product.product',
-        string='Product',
-        help='Optional: link this request to a specific product.',
+        tracking=True,
     )
     description = fields.Char(
         string='Description',
         required=True,
         help='What is being requested.',
     )
-    quantity = fields.Float(
-        string='Quantity',
-        default=1.0,
-        required=True,
+    line_ids = fields.One2many(
+        comodel_name='purchase.request.line',
+        inverse_name='request_id',
+        string='Products',
     )
     justification = fields.Text(string='Justification')
     state = fields.Selection(
@@ -47,6 +44,7 @@ class PurchaseRequest(models.Model):
         default='draft',
         required=True,
         copy=False,
+        tracking=True,
     )
     purchase_order_id = fields.Many2one(
         comodel_name='purchase.order',
@@ -64,9 +62,15 @@ class PurchaseRequest(models.Model):
         return super().create(vals_list)
 
     def action_submit(self):
+        for rec in self:
+            if not rec.line_ids:
+                raise UserError('Add at least one product line before submitting.')
         self.write({'state': 'submitted'})
 
     def action_approve(self):
+        for rec in self:
+            if rec.employee_id == self.env.user:
+                raise UserError('You cannot approve your own request.')
         self.write({'state': 'approved'})
 
     def action_reject(self):
@@ -78,12 +82,6 @@ class PurchaseRequest(models.Model):
     def action_convert_to_rfq(self):
         """Create a draft RFQ (purchase.order) from this approved request,
         so Procurement can then assign vendors and send it out.
-
-        Odoo's purchase.order requires a Vendor (partner_id) to be set on
-        creation. Since Procurement hasn't picked vendors yet at this stage,
-        we use a placeholder vendor (the first available supplier contact)
-        so the RFQ can be created; Procurement is expected to update the
-        Vendor/Vendors fields immediately on the new RFQ.
         """
         self.ensure_one()
         if self.state != 'approved':
@@ -103,19 +101,16 @@ class PurchaseRequest(models.Model):
         order_vals = {
             'origin': self.name,
             'partner_id': placeholder_vendor.id,
+            'order_line': [(0, 0, {
+                'product_id': line.product_id.id,
+                'name': line.description or line.product_id.name,
+                'product_qty': line.quantity,
+                'product_uom_id': line.uom_id.id or line.product_id.uom_id.id,
+                'price_unit': line.estimated_price,
+                'date_planned': fields.Datetime.now(),
+            }) for line in self.line_ids],
         }
         po = self.env['purchase.order'].create(order_vals)
-
-        if self.product_id:
-            self.env['purchase.order.line'].create({
-                'order_id': po.id,
-                'product_id': self.product_id.id,
-                'name': self.description,
-                'product_qty': self.quantity,
-                'product_uom_id': self.product_id.uom_id.id,
-                'price_unit': 0.0,
-                'date_planned': fields.Datetime.now(),
-            })
 
         self.write({
             'state': 'converted',

@@ -18,6 +18,7 @@ class PurchaseBid(models.Model):
         comodel_name='res.partner',
         string='Vendor',
         required=True,
+        domain=[('supplier_rank', '>', 0)],
         help='The vendor who submitted this bid.',
     )
     price = fields.Monetary(
@@ -65,6 +66,7 @@ class PurchaseBid(models.Model):
         po = self.purchase_order_id
         po.write({
             'partner_id': self.vendor_id.id,
+            'vendor_ids': [(6, 0, [self.vendor_id.id])],
         })
         for line in po.order_line:
             line.price_unit = self.price if len(po.order_line) == 1 else line.price_unit

@@ -10,7 +10,7 @@
     """,
     'author': 'Racheal Acio',
     'category': 'Purchases',
-    'depends': ['purchase'],
+    'depends': ['purchase', 'mail'],
     'data': [
         'security/ir.model.access.csv',
         'data/ir_sequence_data.xml',

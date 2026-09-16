@@ -10,6 +10,7 @@ class PurchaseOrder(models.Model):
         column1='purchase_order_id',
         column2='partner_id',
         string='Vendors',
+        domain=[('supplier_rank', '>', 0)],
         help='Select multiple vendors this RFQ should be sent to.',
     )
     bid_ids = fields.One2many(
